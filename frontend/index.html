@@ -152,7 +152,7 @@
       // CONFIG
       // ---------------------------------------------------------------
       // Point this at your FastAPI server. Update for production.
-      const API_BASE = "http://43.204.143.5:8000";
+      const API_BASE = "http://localhost:8000";
 
       // ---------------------------------------------------------------
       // API CLIENT
@@ -477,8 +477,16 @@
 
       function databaseOptionsHtml() {
         return state.databases
-          .map((d) => `<option value="${d.id}">${d.name} (${d.db_host})</option>`)
+          .map((d) => `<option value="${d.id}">${d.name}</option>`)
           .join("");
+      }
+
+      // Masks a host/endpoint down to a few leading characters plus asterisks,
+      // e.g. "test-client-db.abc123xyz.ap-south-1.rds.amazonaws.com" -> "test-cl********"
+      function maskHost(host) {
+        if (!host) return "—";
+        const visible = host.slice(0, 6);
+        return `${visible}${"*".repeat(8)}`;
       }
 
       // ---------------------------------------------------------------
@@ -844,7 +852,7 @@
                   (d) => `
                 <tr>
                   <td>${d.name}</td>
-                  <td>${d.db_host}</td>
+                  <td>${maskHost(d.db_host)}</td>
                   <td>${d.db_port}</td>
                   <td>${d.db_name}</td>
                   <td><span class="pill ${d.is_active ? "" : "badge-warning"}">${d.is_active ? "Active" : "Inactive"}</span></td>

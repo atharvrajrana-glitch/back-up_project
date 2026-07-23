@@ -1,6 +1,6 @@
 FROM python:3.14-slim
 
-COPY --from=docker:24-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker:29-cli /usr/local/bin/docker /usr/local/bin/docker
 
 WORKDIR /app
 

@@ -1,0 +1,816 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Automated Database Backup Platform</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #020617;
+        --panel: rgba(15, 23, 42, 0.9);
+        --panel-2: rgba(15, 23, 42, 0.72);
+        --border: rgba(148, 163, 184, 0.16);
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --blue: #3b82f6;
+        --blue-2: #60a5fa;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at top left, rgba(59,130,246,0.18), transparent 30%), linear-gradient(135deg, #020617 0%, #0f172a 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      button, input, select { font: inherit; }
+      .app { display: flex; min-height: 100vh; }
+      .sidebar {
+        width: 260px;
+        padding: 20px 14px;
+        background: rgba(2, 8, 23, 0.95);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .sidebar.collapsed { width: 82px; }
+      .sidebar.collapsed .nav span:last-child { display: none; }
+      .sidebar.collapsed .nav button { justify-content: center; }
+      .brand { display: flex; align-items: center; gap: 12px; padding: 8px; }
+      .brand-icon {
+        width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+        background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(96,165,250,0.18));
+        color: var(--blue-2);
+      }
+      .brand-title { font-weight: 700; font-size: 0.95rem; }
+      .brand-sub { font-size: 0.8rem; color: var(--muted); }
+      .toggle { margin-left: auto; border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 10px; padding: 7px; cursor: pointer; }
+      .nav { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+      .nav button {
+        border: none; background: transparent; color: var(--muted); text-align: left; padding: 11px 12px; border-radius: 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; transition: 180ms ease; overflow: hidden; white-space: nowrap;
+      }
+      .nav button.active, .nav button:hover {
+        background: rgba(59,130,246,0.16); color: white;
+      }
+      .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+      .topbar {
+        padding: 20px 24px; border-bottom: 1px solid var(--border); background: rgba(2, 8, 23, 0.8); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      }
+      .topbar .title { font-size: 1rem; font-weight: 600; color: #dbeafe; }
+      .toolbar { display: flex; align-items: center; gap: 10px; }
+      .search, .chip-btn {
+        border: 1px solid var(--border); background: rgba(15,23,42,0.8); color: var(--muted); border-radius: 999px; padding: 10px 12px; display: flex; align-items: center; gap: 8px;
+      }
+      .profile { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); padding: 6px 10px; border-radius: 999px; background: rgba(15,23,42,0.8); cursor: pointer; }
+      .avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--blue), #1d4ed8); display: grid; place-items: center; font-weight: 700; }
+      .content { padding: 24px; display: grid; gap: 18px; }
+      .hero {
+        display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 24px; border-radius: 24px; background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(15,23,42,0.9)); border: 1px solid rgba(96,165,250,0.24); box-shadow: 0 18px 40px rgba(2,8,23,0.3);
+      }
+      .hero h2 { margin: 4px 0 8px; font-size: 1.45rem; }
+      .hero p { color: var(--muted); margin: 0; }
+      .hero .cta { background: var(--blue); color: white; border: none; border-radius: 14px; padding: 12px 16px; font-weight: 600; cursor: pointer; }
+      .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 18px; box-shadow: 0 16px 36px rgba(2,8,23,0.24); }
+      .metric { display: flex; justify-content: space-between; align-items: center; }
+      .metric .value { font-size: 1.4rem; font-weight: 700; }
+      .metric .sub { color: var(--muted); font-size: 0.9rem; }
+      .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; border-radius: 999px; padding: 5px 8px; background: rgba(34,197,94,0.12); color: #bbf7d0; }
+      .grid-2 { display: grid; grid-template-columns: 1.4fr 0.8fr; gap: 16px; }
+      .list { display: grid; gap: 10px; }
+      .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--panel-2); border: 1px solid var(--border); }
+      .muted { color: var(--muted); }
+      .table-wrap { overflow: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+      th { color: var(--muted); font-weight: 600; }
+      .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+      .mini-btn { background: transparent; color: #dbeafe; border: 1px solid var(--border); border-radius: 10px; padding: 7px 9px; cursor: pointer; }
+      .mini-btn.primary { background: var(--blue); border-color: var(--blue); }
+      .mini-btn.warn { border-color: rgba(245,158,11,0.3); color: #fde68a; }
+      .mini-btn.danger { border-color: rgba(239,68,68,0.35); color: #fecaca; }
+      .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .stack { display: grid; gap: 12px; }
+      .timeline { border-left: 2px solid rgba(59,130,246,0.28); padding-left: 14px; display: grid; gap: 10px; }
+      .timeline .item { position: relative; }
+      .timeline .item::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); position: absolute; left: -20px; top: 4px; }
+      form { display: grid; gap: 10px; }
+      .field { display: grid; gap: 6px; }
+      .field input, .field select { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(15,23,42,0.8); color: white; }
+      .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .modal { position: fixed; inset: 0; background: rgba(2,8,23,0.7); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+      .modal.open { display: flex; }
+      .modal-card { width: min(720px, 100%); border: 1px solid var(--border); background: var(--panel); border-radius: 24px; padding: 20px; box-shadow: 0 20px 60px rgba(2,8,23,0.35); }
+      .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+      .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+      .badge-success { color: #bbf7d0; background: rgba(34,197,94,0.12); }
+      .badge-warning { color: #fde68a; background: rgba(245,158,11,0.12); }
+      .badge-danger { color: #fecaca; background: rgba(239,68,68,0.12); }
+      .muted-small { font-size: 0.85rem; color: var(--muted); }
+      .error-text { color: #fecaca; font-size: 0.85rem; }
+      .toast-wrap { position: fixed; top: 18px; right: 18px; display: grid; gap: 8px; z-index: 40; }
+      .toast { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); box-shadow: 0 12px 30px rgba(2,8,23,0.4); font-size: 0.9rem; min-width: 220px; }
+      .toast.success { border-color: rgba(34,197,94,0.35); }
+      .toast.error { border-color: rgba(239,68,68,0.35); }
+      .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+      .login-card { width: min(380px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 24px; padding: 28px; box-shadow: 0 20px 60px rgba(2,8,23,0.4); }
+      @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+      @media (max-width: 720px) {
+        .sidebar { width: 84px; }
+        .sidebar .brand-title, .sidebar .brand-sub, .sidebar .nav span { display: none; }
+        .topbar { flex-wrap: wrap; }
+        .hero { flex-direction: column; align-items: flex-start; }
+        .row { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <div class="modal" id="modal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <h3 id="modalTitle" style="margin:0">Modal</h3>
+            <div class="muted-small" id="modalSubtitle">Details</div>
+          </div>
+          <button class="mini-btn" id="closeModal">✕</button>
+        </div>
+        <div id="modalBody"></div>
+      </div>
+    </div>
+
+    <div class="toast-wrap" id="toastWrap"></div>
+
+    <script>
+      // ---------------------------------------------------------------
+      // CONFIG
+      // ---------------------------------------------------------------
+      // Point this at your FastAPI server. Update for production.
+      const API_BASE = "http://localhost:8000";
+
+      // ---------------------------------------------------------------
+      // API CLIENT
+      // ---------------------------------------------------------------
+      function getToken() {
+        return localStorage.getItem("access_token");
+      }
+      function setToken(token) {
+        localStorage.setItem("access_token", token);
+      }
+      function clearToken() {
+        localStorage.removeItem("access_token");
+      }
+
+      async function api(path, { method = "GET", body, params, auth = true } = {}) {
+        let url = `${API_BASE}${path}`;
+        if (params) {
+          const qs = new URLSearchParams(params).toString();
+          url += `?${qs}`;
+        }
+        const headers = { "Content-Type": "application/json" };
+        if (auth) {
+          const token = getToken();
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+        }
+        let res;
+        try {
+          res = await fetch(url, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
+          });
+        } catch (networkErr) {
+          throw new Error(
+            `Could not reach the server at ${API_BASE}. Is the backend running and is CORS enabled?`
+          );
+        }
+
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (_) {
+          // no body
+        }
+
+        if (res.status === 401) {
+          clearToken();
+          state.page = "login";
+          renderApp();
+          throw new Error("Session expired. Please log in again.");
+        }
+
+        if (!res.ok) {
+          const detail = data && data.detail;
+          const message =
+            (detail && (detail.error || detail.message)) ||
+            (typeof detail === "string" ? detail : null) ||
+            `Request failed (${res.status})`;
+          throw new Error(message);
+        }
+
+        return data;
+      }
+
+      // ---------------------------------------------------------------
+      // TOASTS
+      // ---------------------------------------------------------------
+      function toast(message, type = "success") {
+        const wrap = document.getElementById("toastWrap");
+        const el = document.createElement("div");
+        el.className = `toast ${type}`;
+        el.textContent = message;
+        wrap.appendChild(el);
+        setTimeout(() => el.remove(), 4500);
+      }
+
+      // ---------------------------------------------------------------
+      // MODAL HELPERS
+      // ---------------------------------------------------------------
+      function clearModal() {
+        document.getElementById("modal").classList.remove("open");
+      }
+      function openModal(title, subtitle, bodyHtml) {
+        document.getElementById("modalTitle").textContent = title;
+        document.getElementById("modalSubtitle").textContent = subtitle;
+        document.getElementById("modalBody").innerHTML = bodyHtml;
+        document.getElementById("modal").classList.add("open");
+      }
+      document.getElementById("closeModal").addEventListener("click", clearModal);
+      document.getElementById("modal").addEventListener("click", (e) => {
+        if (e.target.id === "modal") clearModal();
+      });
+
+      // ---------------------------------------------------------------
+      // STATE
+      // ---------------------------------------------------------------
+      const state = {
+        page: getToken() ? "dashboard" : "login",
+        collapsed: false,
+        databases: [],
+        loadingDatabases: false,
+      };
+
+      const menuItems = [
+        { id: "dashboard", label: "Dashboard", icon: "▣" },
+        { id: "databases", label: "Registered Databases", icon: "◍" },
+        { id: "restore", label: "Restore", icon: "↺" },
+        { id: "reconciliation", label: "Reconciliation", icon: "⟲" },
+      ];
+
+      // ---------------------------------------------------------------
+      // LOGIN SCREEN
+      // ---------------------------------------------------------------
+      function renderLogin() {
+        document.getElementById("root").innerHTML = `
+          <div class="login-screen">
+            <div class="login-card">
+              <div class="brand" style="padding:0;margin-bottom:18px">
+                <div class="brand-icon">◉</div>
+                <div>
+                  <div class="brand-title">Backup OS</div>
+                  <div class="brand-sub">Sign in to continue</div>
+                </div>
+              </div>
+              <form id="loginForm">
+                <div class="field">
+                  <label>Username</label>
+                  <input id="loginUsername" required />
+                </div>
+                <div class="field">
+                  <label>Password</label>
+                  <input id="loginPassword" type="password" required />
+                </div>
+                <div class="error-text" id="loginError" style="display:none"></div>
+                <button class="mini-btn primary" type="submit" style="margin-top:6px">Sign In</button>
+              </form>
+            </div>
+          </div>
+        `;
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const username = document.getElementById("loginUsername").value.trim();
+          const password = document.getElementById("loginPassword").value;
+          const errorEl = document.getElementById("loginError");
+          errorEl.style.display = "none";
+          try {
+            // NOTE: backend returns {"Authorization": "Bearer <token>"} rather than
+            // the more conventional {"access_token": "..."}. We parse that shape here.
+            const result = await api("/api/v1/auth/login", {
+              method: "POST",
+              body: { username, password },
+              auth: false,
+            });
+            const authHeader = result.Authorization || "";
+            const token = authHeader.replace(/^Bearer\s+/i, "");
+            if (!token) throw new Error("Login response did not include a token.");
+            setToken(token);
+            state.page = "dashboard";
+            renderApp();
+            toast("Signed in successfully");
+          } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = "block";
+          }
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // SHELL (sidebar + topbar)
+      // ---------------------------------------------------------------
+      function renderShell() {
+        document.getElementById("root").innerHTML = `
+          <div class="app">
+            <aside class="sidebar" id="sidebar">
+              <div class="brand">
+                <div class="brand-icon">◉</div>
+                <div id="brandText">
+                  <div class="brand-title">Backup OS</div>
+                  <div class="brand-sub">Enterprise control</div>
+                </div>
+                <button class="toggle" id="toggleSidebar" aria-label="Toggle sidebar">☰</button>
+              </div>
+              <nav class="nav" id="nav"></nav>
+            </aside>
+            <main class="main">
+              <header class="topbar">
+                <div>
+                  <div class="title">Automated Database Backup Platform</div>
+                  <div class="muted-small">Secure backups, fast restores, and clean reconciliation</div>
+                </div>
+                <div class="toolbar">
+                  <div class="profile" id="logoutBtn">
+                    <div class="avatar">A</div>
+                    <div><div style="font-weight:600">Admin</div><div class="muted-small">Sign out</div></div>
+                  </div>
+                </div>
+              </header>
+              <section class="content" id="content"></section>
+            </main>
+          </div>
+        `;
+        document.getElementById("toggleSidebar").addEventListener("click", () => {
+          state.collapsed = !state.collapsed;
+          document.getElementById("sidebar").classList.toggle("collapsed", state.collapsed);
+          document.getElementById("brandText").style.display = state.collapsed ? "none" : "block";
+        });
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+          clearToken();
+          state.page = "login";
+          renderApp();
+        });
+        renderNav();
+      }
+
+      function renderNav() {
+        const nav = document.getElementById("nav");
+        nav.innerHTML = menuItems
+          .map(
+            (item) => `
+          <button class="${state.page === item.id ? "active" : ""}" data-page="${item.id}">
+            <span>${item.icon}</span><span>${item.label}</span>
+          </button>
+        `
+          )
+          .join("");
+        nav.querySelectorAll("button").forEach((btn) =>
+          btn.addEventListener("click", () => {
+            state.page = btn.getAttribute("data-page");
+            renderNav();
+            renderPage();
+          })
+        );
+      }
+
+      // ---------------------------------------------------------------
+      // DATABASES (real data)
+      // ---------------------------------------------------------------
+      async function fetchDatabases() {
+        state.loadingDatabases = true;
+        try {
+          state.databases = await api("/api/v1/database/get_registered-databases");
+        } catch (err) {
+          toast(err.message, "error");
+          state.databases = [];
+        } finally {
+          state.loadingDatabases = false;
+        }
+      }
+
+      function databaseOptionsHtml() {
+        return state.databases
+          .map((d) => `<option value="${d.id}">${d.name} (${d.db_host})</option>`)
+          .join("");
+      }
+
+      // ---------------------------------------------------------------
+      // BACKUPS
+      // ---------------------------------------------------------------
+      // Turns a raw S3 key like "backups/client_prod_db_20260723_050559.sql"
+      // into a clean label like "client_prod_db — Jul 23, 2026, 5:05:59 AM".
+      // The full key is still used as the <option> value so restore/reconcile
+      // keep working — this only changes what the client sees.
+      function formatBackupLabel(filename) {
+        const base = filename.split("/").pop().replace(/\.sql$/i, "");
+        const match = base.match(/^(.*)_(\d{8})_(\d{6})$/);
+        if (!match) return base; // unexpected naming, fall back to raw name
+        const [, dbName, datePart, timePart] = match;
+        const year = datePart.slice(0, 4);
+        const month = datePart.slice(4, 6);
+        const day = datePart.slice(6, 8);
+        const hour = timePart.slice(0, 2);
+        const minute = timePart.slice(2, 4);
+        const second = timePart.slice(4, 6);
+        const dateObj = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+        const formatted = isNaN(dateObj.getTime())
+          ? `${year}-${month}-${day} ${hour}:${minute}:${second}`
+          : dateObj.toLocaleString();
+        return `${dbName} — ${formatted}`;
+      }
+
+      // Used by Reconciliation: only the backups belonging to the ONE
+      // selected database (backend filters by that db's name prefix).
+      async function loadBackupsForDb(dbId, selectElementId) {
+        const select = document.getElementById(selectElementId);
+        if (!select) return;
+        if (!dbId) {
+          select.innerHTML = `<option value="">Select a database first</option>`;
+          return;
+        }
+        select.innerHTML = `<option value="">Loading backups…</option>`;
+        select.disabled = true;
+        try {
+          const backups = await api(`/api/v1/backups/list/${dbId}`);
+          if (!backups || backups.length === 0) {
+            select.innerHTML = `<option value="">No backups found</option>`;
+            return;
+          }
+          select.innerHTML = backups
+            .map((b) => `<option value="${b.filename}">${formatBackupLabel(b.filename)}</option>`)
+            .join("");
+        } catch (err) {
+          select.innerHTML = `<option value="">Failed to load backups</option>`;
+          toast(err.message, "error");
+        } finally {
+          select.disabled = false;
+        }
+      }
+
+      // Used by Restore: every backup across ALL databases this admin
+      // owns, so a backup from an old/renamed database can be restored
+      // onto a different target. Backend still scopes this to the
+      // logged-in admin's own databases only — never another admin's.
+      async function loadAllBackups(selectElementId) {
+        const select = document.getElementById(selectElementId);
+        if (!select) return;
+        select.innerHTML = `<option value="">Loading backups…</option>`;
+        select.disabled = true;
+        try {
+          const backups = await api(`/api/v1/backups/list-all`);
+          if (!backups || backups.length === 0) {
+            select.innerHTML = `<option value="">No backups found</option>`;
+            return;
+          }
+          select.innerHTML = backups
+            .map((b) => `<option value="${b.filename}">${formatBackupLabel(b.filename)}</option>`)
+            .join("");
+        } catch (err) {
+          select.innerHTML = `<option value="">Failed to load backups</option>`;
+          toast(err.message, "error");
+        } finally {
+          select.disabled = false;
+        }
+      }
+
+      function openRegisterDbModal() {
+        openModal(
+          "Register database",
+          "Add a new PostgreSQL target",
+          `
+          <form id="registerDbForm">
+            <div class="row">
+              <div class="field"><label>Display Name</label><input id="rdName" placeholder="Client Prod DB" required /></div>
+              <div class="field"><label>Host</label><input id="rdHost" placeholder="prod-db-01.example.com" required /></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Port</label><input id="rdPort" value="5432" required /></div>
+              <div class="field"><label>Username</label><input id="rdUser" placeholder="postgres" required /></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Password</label><input id="rdPassword" type="password" required /></div>
+              <div class="field"><label>Database Name</label><input id="rdDbName" placeholder="client_prod" required /></div>
+            </div>
+            <div class="error-text" id="registerDbError" style="display:none"></div>
+            <div class="modal-actions">
+              <button class="mini-btn" type="button" onclick="clearModal()">Cancel</button>
+              <button class="mini-btn primary" type="submit">Save</button>
+            </div>
+          </form>
+        `
+        );
+        document.getElementById("registerDbForm").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const errorEl = document.getElementById("registerDbError");
+          errorEl.style.display = "none";
+          const payload = {
+            name: document.getElementById("rdName").value.trim(),
+            db_host: document.getElementById("rdHost").value.trim(),
+            db_port: document.getElementById("rdPort").value.trim(),
+            db_user: document.getElementById("rdUser").value.trim(),
+            db_password: document.getElementById("rdPassword").value,
+            db_name: document.getElementById("rdDbName").value.trim(),
+          };
+          try {
+            await api("/api/v1/database/register", { method: "POST", body: payload });
+            clearModal();
+            toast("Database registered successfully");
+            await fetchDatabases();
+            renderPage();
+          } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = "block";
+          }
+        });
+      }
+
+      async function deleteDatabase(id, name) {
+        if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+        try {
+          await api(`/api/v1/database/registered-databases/${id}`, { method: "DELETE" });
+          toast("Database deleted");
+          await fetchDatabases();
+          renderPage();
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }
+
+      async function triggerBackup(id, btn) {
+        btn.disabled = true;
+        btn.textContent = "Running…";
+        try {
+          const result = await api(`/api/v1/backups/trigger/${id}`, { method: "POST" });
+          toast(result.message || "Backup triggered successfully");
+        } catch (err) {
+          toast(err.message, "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Backup";
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // RESTORE
+      // ---------------------------------------------------------------
+      async function runRestore(e) {
+        e.preventDefault();
+        const dbId = document.getElementById("restoreDbSelect").value;
+        const filename = document.getElementById("restoreFilename").value;
+        const resultEl = document.getElementById("restoreResult");
+        const btn = document.getElementById("restoreSubmitBtn");
+        if (!dbId || !filename) {
+          resultEl.innerHTML = `<div class="error-text">Select a database and a backup file.</div>`;
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = "Restoring…";
+        resultEl.innerHTML = "";
+        try {
+          const result = await api(`/api/v1/backups/restore/${dbId}`, {
+            method: "POST",
+            params: { s3_filename: filename },
+          });
+          resultEl.innerHTML = `<div class="pill">Restore completed</div>`;
+          toast("Restore completed successfully");
+        } catch (err) {
+          resultEl.innerHTML = `<div class="error-text">${err.message}</div>`;
+          toast("Restore failed", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Restore Database";
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // RECONCILIATION
+      // ---------------------------------------------------------------
+      async function runReconciliation(e) {
+        e.preventDefault();
+        const dbId = document.getElementById("reconDbSelect").value;
+        const filename = document.getElementById("reconFilename").value;
+        const resultEl = document.getElementById("reconResult");
+        const btn = document.getElementById("reconSubmitBtn");
+        if (!dbId || !filename) {
+          resultEl.innerHTML = `<div class="error-text">Select a database and a backup file.</div>`;
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = "Reconciling…";
+        resultEl.innerHTML = "";
+        try {
+          const result = await api(`/api/v1/backups/reconcile/${dbId}`, {
+            method: "POST",
+            params: { s3_filename: filename },
+          });
+          resultEl.innerHTML = `
+            <div class="kpis">
+              <div class="card"><div class="sub">Status</div><div class="value">${result.status || "success"}</div></div>
+            </div>
+          `;
+          toast("Reconciliation completed successfully");
+        } catch (err) {
+          resultEl.innerHTML = `<div class="error-text">${err.message}</div>`;
+          toast("Reconciliation failed", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Reconcile";
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // PAGE RENDERING
+      // ---------------------------------------------------------------
+      async function renderPage() {
+        const content = document.getElementById("content");
+
+        if (state.page === "dashboard") {
+          content.innerHTML = `
+            <div class="hero">
+              <div>
+                <div class="pill">● Connected</div>
+                <h2>Operational control for every backup lifecycle</h2>
+                <p>Monitor database health, protect critical systems, and restore business continuity.</p>
+              </div>
+            </div>
+            <div class="kpis">
+              <div class="card"><div class="metric"><div><div class="sub">Registered Databases</div><div class="value" id="kpiDbCount">–</div></div></div></div>
+            </div>
+            <div class="card">
+              <div class="metric"><div><h3 style="margin:0">Quick Actions</h3><div class="sub">Jump straight to a workflow</div></div></div>
+              <div class="list" style="margin-top:12px">
+                <div class="list-item"><div>View and manage registered databases</div><button class="mini-btn" data-page="databases">Open</button></div>
+                <div class="list-item"><div>Restore a database from an S3 backup</div><button class="mini-btn" data-page="restore">Open</button></div>
+                <div class="list-item"><div>Reconcile a database against a backup</div><button class="mini-btn" data-page="reconciliation">Open</button></div>
+              </div>
+            </div>
+          `;
+          content.querySelectorAll("[data-page]").forEach((btn) =>
+            btn.addEventListener("click", () => {
+              state.page = btn.getAttribute("data-page");
+              renderNav();
+              renderPage();
+            })
+          );
+          await fetchDatabases();
+          const kpiEl = document.getElementById("kpiDbCount");
+          if (kpiEl) kpiEl.textContent = state.databases.length;
+        }
+
+        else if (state.page === "databases") {
+          content.innerHTML = `
+            <div class="card">
+              <div class="metric" style="margin-bottom:12px">
+                <div><h3 style="margin:0">Registered Databases</h3><div class="sub">Manage your PostgreSQL targets.</div></div>
+                <button class="mini-btn primary" id="registerDbBtn">Register Database</button>
+              </div>
+              <div class="table-wrap" id="dbTableWrap">
+                <div class="muted-small">Loading…</div>
+              </div>
+            </div>
+          `;
+          document.getElementById("registerDbBtn").addEventListener("click", openRegisterDbModal);
+          await fetchDatabases();
+          renderDatabaseTable();
+        }
+
+        else if (state.page === "restore") {
+          content.innerHTML = `
+            <div class="card">
+              <h3 style="margin:0 0 8px">Restore Workspace</h3>
+              <div class="sub">Pick the target database, then choose any backup from your account to restore onto it — including backups from other databases you own.</div>
+              <form id="restoreForm" style="margin-top:12px">
+                <div class="row">
+                  <div class="field"><label>Target Database</label>
+                    <select id="restoreDbSelect">
+                      <option value="">Select a database…</option>
+                      ${databaseOptionsHtml()}
+                    </select>
+                  </div>
+                  <div class="field"><label>S3 Backup File</label>
+                    <select id="restoreFilename">
+                      <option value="">Loading backups…</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="mini-btn primary" type="submit" id="restoreSubmitBtn">Restore Database</button>
+                <div id="restoreResult" style="margin-top:10px"></div>
+              </form>
+            </div>
+          `;
+          if (state.databases.length === 0) await fetchDatabases();
+          const sel = document.getElementById("restoreDbSelect");
+          if (sel) {
+            sel.innerHTML = `<option value="">Select a database…</option>${databaseOptionsHtml()}`;
+          }
+          document.getElementById("restoreForm").addEventListener("submit", runRestore);
+          await loadAllBackups("restoreFilename");
+        }
+
+        else if (state.page === "reconciliation") {
+          content.innerHTML = `
+            <div class="card">
+              <h3 style="margin:0 0 8px">Reconciliation Workflow</h3>
+              <div class="sub">Restore deleted or missing records by reconciling a database against one of its own backup files.</div>
+              <form id="reconForm" style="margin-top:12px">
+                <div class="row">
+                  <div class="field"><label>Registered Database</label>
+                    <select id="reconDbSelect">
+                      <option value="">Select a database…</option>
+                      ${databaseOptionsHtml()}
+                    </select>
+                  </div>
+                  <div class="field"><label>S3 Backup File</label>
+                    <select id="reconFilename">
+                      <option value="">Select a database first</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="mini-btn primary" type="submit" id="reconSubmitBtn">Reconcile</button>
+                <div id="reconResult" style="margin-top:10px"></div>
+              </form>
+            </div>
+          `;
+          if (state.databases.length === 0) await fetchDatabases();
+          const sel = document.getElementById("reconDbSelect");
+          if (sel) {
+            sel.innerHTML = `<option value="">Select a database…</option>${databaseOptionsHtml()}`;
+            sel.addEventListener("change", () => loadBackupsForDb(sel.value, "reconFilename"));
+          }
+          document.getElementById("reconForm").addEventListener("submit", runReconciliation);
+        }
+      }
+
+      function renderDatabaseTable() {
+        const wrap = document.getElementById("dbTableWrap");
+        if (!wrap) return;
+        if (state.databases.length === 0) {
+          wrap.innerHTML = `<div class="muted-small">No databases registered yet.</div>`;
+          return;
+        }
+        wrap.innerHTML = `
+          <table>
+            <thead><tr><th>Name</th><th>Host</th><th>Port</th><th>Database</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${state.databases
+                .map(
+                  (d) => `
+                <tr>
+                  <td>${d.name}</td>
+                  <td>${d.db_host}</td>
+                  <td>${d.db_port}</td>
+                  <td>${d.db_name}</td>
+                  <td><span class="pill ${d.is_active ? "" : "badge-warning"}">${d.is_active ? "Active" : "Inactive"}</span></td>
+                  <td>${d.created_at ? new Date(d.created_at).toLocaleDateString() : "–"}</td>
+                  <td><div class="actions">
+                    <button class="mini-btn" data-backup="${d.id}">Backup</button>
+                    <button class="mini-btn danger" data-delete="${d.id}" data-name="${d.name}">Delete</button>
+                  </div></td>
+                </tr>
+              `
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `;
+        wrap.querySelectorAll("[data-backup]").forEach((btn) =>
+          btn.addEventListener("click", () => triggerBackup(btn.getAttribute("data-backup"), btn))
+        );
+        wrap.querySelectorAll("[data-delete]").forEach((btn) =>
+          btn.addEventListener("click", () =>
+            deleteDatabase(btn.getAttribute("data-delete"), btn.getAttribute("data-name"))
+          )
+        );
+      }
+
+      // ---------------------------------------------------------------
+      // APP ENTRY
+      // ---------------------------------------------------------------
+      function renderApp() {
+        if (state.page === "login" || !getToken()) {
+          renderLogin();
+          return;
+        }
+        renderShell();
+        renderPage();
+      }
+      
+
+      renderApp();
+    </script>
+  </body>
+</html>

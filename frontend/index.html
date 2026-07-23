@@ -251,6 +251,7 @@
       // ---------------------------------------------------------------
       const state = {
         page: getToken() ? "dashboard" : "login",
+        authMode: "login", // "login" | "register"
         collapsed: false,
         databases: [],
         loadingDatabases: false,
@@ -266,7 +267,9 @@
       // ---------------------------------------------------------------
       // LOGIN SCREEN
       // ---------------------------------------------------------------
-      function renderLogin() {
+      function renderLogin(prefillUsername = "") {
+        const isRegister = state.authMode === "register";
+
         document.getElementById("root").innerHTML = `
           <div class="login-screen">
             <div class="login-card">
@@ -274,50 +277,120 @@
                 <div class="brand-icon">◉</div>
                 <div>
                   <div class="brand-title">Backup OS</div>
-                  <div class="brand-sub">Sign in to continue</div>
+                  <div class="brand-sub">${isRegister ? "Create your account" : "Sign in to continue"}</div>
                 </div>
               </div>
+
+              ${
+                isRegister
+                  ? `
+              <form id="registerForm">
+                <div class="field">
+                  <label>Username</label>
+                  <input id="registerUsername" value="${prefillUsername}" required />
+                </div>
+                <div class="field">
+                  <label>Password</label>
+                  <input id="registerPassword" type="password" required />
+                </div>
+                <div class="field">
+                  <label>Confirm Password</label>
+                  <input id="registerPasswordConfirm" type="password" required />
+                </div>
+                <div class="error-text" id="authError" style="display:none"></div>
+                <button class="mini-btn primary" type="submit" style="margin-top:6px">Create Account</button>
+              </form>
+              <div class="muted-small" style="margin-top:14px; text-align:center">
+                Already have an account?
+                <a href="#" id="toggleAuthMode" style="color:#93c5fd; text-decoration:none">Sign in</a>
+              </div>
+              `
+                  : `
               <form id="loginForm">
                 <div class="field">
                   <label>Username</label>
-                  <input id="loginUsername" required />
+                  <input id="loginUsername" value="${prefillUsername}" required />
                 </div>
                 <div class="field">
                   <label>Password</label>
                   <input id="loginPassword" type="password" required />
                 </div>
-                <div class="error-text" id="loginError" style="display:none"></div>
+                <div class="error-text" id="authError" style="display:none"></div>
                 <button class="mini-btn primary" type="submit" style="margin-top:6px">Sign In</button>
               </form>
+              <div class="muted-small" style="margin-top:14px; text-align:center">
+                Don't have an account?
+                <a href="#" id="toggleAuthMode" style="color:#93c5fd; text-decoration:none">Register</a>
+              </div>
+              `
+              }
             </div>
           </div>
         `;
-        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+
+        document.getElementById("toggleAuthMode").addEventListener("click", (e) => {
           e.preventDefault();
-          const username = document.getElementById("loginUsername").value.trim();
-          const password = document.getElementById("loginPassword").value;
-          const errorEl = document.getElementById("loginError");
-          errorEl.style.display = "none";
-          try {
-            // NOTE: backend returns {"Authorization": "Bearer <token>"} rather than
-            // the more conventional {"access_token": "..."}. We parse that shape here.
-            const result = await api("/api/v1/auth/login", {
-              method: "POST",
-              body: { username, password },
-              auth: false,
-            });
-            const authHeader = result.Authorization || "";
-            const token = authHeader.replace(/^Bearer\s+/i, "");
-            if (!token) throw new Error("Login response did not include a token.");
-            setToken(token);
-            state.page = "dashboard";
-            renderApp();
-            toast("Signed in successfully");
-          } catch (err) {
-            errorEl.textContent = err.message;
-            errorEl.style.display = "block";
-          }
+          state.authMode = isRegister ? "login" : "register";
+          renderLogin();
         });
+
+        if (isRegister) {
+          document.getElementById("registerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const username = document.getElementById("registerUsername").value.trim();
+            const password = document.getElementById("registerPassword").value;
+            const passwordConfirm = document.getElementById("registerPasswordConfirm").value;
+            const errorEl = document.getElementById("authError");
+            errorEl.style.display = "none";
+
+            if (password !== passwordConfirm) {
+              errorEl.textContent = "Passwords do not match.";
+              errorEl.style.display = "block";
+              return;
+            }
+
+            try {
+              await api("/api/v1/auth/register", {
+                method: "POST",
+                body: { username, password },
+                auth: false,
+              });
+              toast("Account created successfully. Please sign in.");
+              state.authMode = "login";
+              renderLogin(username);
+            } catch (err) {
+              errorEl.textContent = err.message;
+              errorEl.style.display = "block";
+            }
+          });
+        } else {
+          document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const username = document.getElementById("loginUsername").value.trim();
+            const password = document.getElementById("loginPassword").value;
+            const errorEl = document.getElementById("authError");
+            errorEl.style.display = "none";
+            try {
+              // NOTE: backend returns {"Authorization": "Bearer <token>"} rather than
+              // the more conventional {"access_token": "..."}. We parse that shape here.
+              const result = await api("/api/v1/auth/login", {
+                method: "POST",
+                body: { username, password },
+                auth: false,
+              });
+              const authHeader = result.Authorization || "";
+              const token = authHeader.replace(/^Bearer\s+/i, "");
+              if (!token) throw new Error("Login response did not include a token.");
+              setToken(token);
+              state.page = "dashboard";
+              renderApp();
+              toast("Signed in successfully");
+            } catch (err) {
+              errorEl.textContent = err.message;
+              errorEl.style.display = "block";
+            }
+          });
+        }
       }
 
       // ---------------------------------------------------------------

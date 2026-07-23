@@ -68,7 +68,7 @@ def run_postgres_backup(db_id: int, db: Session) -> dict:
     # DOCKER CONFIGURATION 
     # We bridge onto your isolated app network, using a matching major version image
     DOCKER_NETWORK = "app_network" 
-    POSTGRES_IMAGE = "postgres:16"  # Using stable v16 CLI utility client
+    POSTGRES_IMAGE = "postgres:18"  # Using stable v18 CLI utility client
 
     #EPHEMERAL DOCKER RUN COMMAND
     command = [
@@ -144,7 +144,7 @@ def run_postgres_restore(db_id:int , s3_filename:str , db:Session) -> dict:
         return {"status":"error","message":"Failed to download bckup from s3"}
     
     DOCKER_NETWORK="app_network"
-    POSTGRES_IMAGE="postgres:16"
+    POSTGRES_IMAGE = "postgres:18"
 
     command = [
         "docker" , "run" , "--rm" , "-i",

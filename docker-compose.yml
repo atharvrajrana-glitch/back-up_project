@@ -1,0 +1,67 @@
+services:
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    restart: unless-stopped
+
+    ports:
+      - "3001:80"
+
+    depends_on:
+      - fastapi-app
+
+    networks:
+      - app_network
+
+  fastapi-app:
+    build: .
+    container_name: fastapi-app
+    restart: always
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    depends_on:
+      postgres-db:
+        condition: service_started
+
+    networks:
+      - app_network
+
+  postgres-db:
+    image: postgres:16
+    container_name: postgres-db
+    restart: always
+
+    environment:
+      POSTGRES_DB: ${SYSTEM_DB_NAME}
+      POSTGRES_USER: ${SYSTEM_DB_USER}
+      POSTGRES_PASSWORD: ${SYSTEM_DB_PASSWORD}
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SYSTEM_DB_USER} -d ${SYSTEM_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    name: app_network
+
+volumes:
+  postgres_data:
